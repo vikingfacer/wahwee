@@ -1,19 +1,19 @@
 
 #include <fcntl.h>
 #include <linux/joystick.h>
-#include <ncurses.h>
 #include <sstream>
 #include <unistd.h>
 
 #include <array>
+#include <ctype.h>
 #include <iostream>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
-#include "argparse.hpp"
+#include <zmq.hpp>
+
 #include "controller.hpp"
+#include <argparse/argparse.hpp>
 
 bool
 read_event(int fd, struct js_event* event);
@@ -91,7 +91,12 @@ main(int argc, char** argv) -> int
       .default_value(std::string("./xboxController.yaml"))
       .help("device path of controller");
 
+    program.add_argument("--port")
+      .default_value(std::string("9999"))
+      .help("Port Bound to for communication to command server");
+
     program.add_argument("--rate")
+      .default_value(5000)
       .help("rate commands are sent (us)")
       .scan<'i', int>();
     try {
@@ -101,23 +106,25 @@ main(int argc, char** argv) -> int
         std::cerr << program;
         std::exit(1);
     }
-
+    // all these values should be checked
     std::string config_file = program.get<std::string>("--config");
     std::string device = program.get<std::string>("--device");
+    std::string port = program.get<std::string>("--port");
+
     int rate = program.get<int>("--rate");
-    program.get<int>("--rate");
-    int js;
 
-    js = open(device.c_str(), O_RDONLY | O_NONBLOCK);
-
+    int js = open(device.c_str(), O_RDONLY | O_NONBLOCK);
     controller::controller control_config(config_file.c_str());
 
     if (js == -1) {
         perror("Could not open joystick");
     } else {
-        // printer js_printer;
-        struct js_event event;
-        size_t axis;
+        zmq::context_t context(1);
+        zmq::socket_t socket(context, zmq::socket_type::pub);
+        socket.bind("tcp://*:" + port);
+
+        struct js_event event
+        {};
 
         /* This loop will exit if the controller is unplugged. */
         while (true) {
