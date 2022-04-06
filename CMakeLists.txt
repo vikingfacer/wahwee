@@ -29,8 +29,7 @@ ExternalProject_Add( argparse
 include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
 
 add_executable ( ${CMAKE_PROJECT_NAME}
-  joystick.cpp 
-  argparse.hpp 
+  joystick.cpp
   controller.hpp)
 
 add_dependencies(${CMAKE_PROJECT_NAME}
@@ -38,5 +37,13 @@ add_dependencies(${CMAKE_PROJECT_NAME}
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
   ${YAML_CPP_LIBRARIES}
-  ${CMAKE_THREAD_LIBS_INIT})
+  zmq)
+
+
+add_executable ( cmd-server
+  cmd-server.cpp
+  )
+target_link_libraries(cmd-server zmq)
+add_dependencies(cmd-server
+  argparse)
 
