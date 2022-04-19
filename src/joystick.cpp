@@ -12,49 +12,30 @@
 
 #include <zmq.hpp>
 
+#include "commandmsg.hpp"
 #include "controller.hpp"
 #include <argparse/argparse.hpp>
 
 bool
 read_event(int fd, struct js_event* event);
 
+// could turn this into generic with template
 float
-shortToPercent(short s, short cutoff)
+shortToPercent(short s)
 {
     float shortMax = static_cast<float>(INT16_MAX);
     float sFloat = static_cast<float>(s);
     float percent = 0;
+
     if (sFloat != 0) {
         percent = (sFloat / shortMax) * 100;
     }
-    if (percent < 0) {
-        percent *= -1;
-    }
+    std::cout << percent << '\n';
     return percent;
 }
 
-std::string
-axis_command(short axisVal, short axisMinabs, short posPin, short negPin)
-{
-    std::stringstream pos_command, neg_command;
-    pos_command << "pwm-set " << posPin << " ";
-    neg_command << "pwm-set " << negPin << " ";
-
-    if (axisVal < 0) {
-        neg_command << shortToPercent(axisVal, axisMinabs);
-        pos_command << 0;
-    } else {
-        pos_command << shortToPercent(axisVal, axisMinabs);
-        neg_command << 0;
-    }
-    pos_command << "\r\n";
-    neg_command << "\r\n";
-
-    return pos_command.str() + neg_command.str();
-}
-
-void
-output_commands(controller::controller con)
+float
+output_commands(controller::controller con, std::string element)
 {
     /*
      * output each controller dependent command
@@ -66,16 +47,14 @@ output_commands(controller::controller con)
             return false;
         }
     };
+
     std::vector<std::pair<std::string, short>>::iterator it_pair =
       std::find_if(con.axis.begin(),
                    con.axis.end(),
-                   std::bind(ret_value, std::placeholders::_1, "leftY"));
-    std::cout << axis_command(it_pair->second, 100, 11, 10) << std::endl;
-    it_pair =
-      std::find_if(con.axis.begin(),
-                   con.axis.end(),
-                   std::bind(ret_value, std::placeholders::_1, "rightY"));
-    std::cout << axis_command(it_pair->second, 100, 3, 5) << std::endl;
+                   std::bind(ret_value, std::placeholders::_1, element));
+    std::cout << it_pair->second << '\n';
+
+    return shortToPercent(it_pair->second);
 }
 
 auto
@@ -140,7 +119,12 @@ main(int argc, char** argv) -> int
                     /* Ignore init events. */
                     break;
             }
-            output_commands(control_config);
+            JScmds::motor_cmd m1(
+              'm', 1, output_commands(control_config, "leftY"));
+            JScmds::motor_cmd m2(
+              'm', 2, output_commands(control_config, "rightY"));
+            socket.send(zmq::buffer(m1.serialize()));
+            socket.send(zmq::buffer(m2.serialize()));
             usleep(rate);
         }
     }
