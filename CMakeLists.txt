@@ -26,11 +26,13 @@ ExternalProject_Add( argparse
     GIT_REPOSITORY https://github.com/p-ranav/argparse.git
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION}
   )
+
 include_directories(${EXTERNAL_INSTALL_LOCATION}/include)
+set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+include_directories(${INCLUDE_DIR})
 
 add_executable ( ${CMAKE_PROJECT_NAME}
-  joystick.cpp
-  controller.hpp)
+  src/joystick.cpp)
 
 add_dependencies(${CMAKE_PROJECT_NAME}
   argparse)
@@ -38,12 +40,4 @@ add_dependencies(${CMAKE_PROJECT_NAME}
 target_link_libraries(${CMAKE_PROJECT_NAME}
   ${YAML_CPP_LIBRARIES}
   zmq)
-
-
-add_executable ( cmd-server
-  cmd-server.cpp
-  )
-target_link_libraries(cmd-server zmq)
-add_dependencies(cmd-server
-  argparse)
 
