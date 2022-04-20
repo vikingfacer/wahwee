@@ -104,6 +104,8 @@ main(int argc, char** argv) -> int
 
         struct js_event event
         {};
+        float lastm1 = 0;
+        float lastm2 = 0;
 
         /* This loop will exit if the controller is unplugged. */
         while (true) {
@@ -119,12 +121,18 @@ main(int argc, char** argv) -> int
                     /* Ignore init events. */
                     break;
             }
-            JScmds::motor_cmd m1(
-              'm', 1, output_commands(control_config, "leftY"));
-            JScmds::motor_cmd m2(
-              'm', 2, output_commands(control_config, "rightY"));
-            socket.send(zmq::buffer(m1.serialize()));
-            socket.send(zmq::buffer(m2.serialize()));
+            float currentm1 = output_commands(control_config, "leftY");
+            float currentm2 = output_commands(control_config, "rightY");
+            if (currentm1 != lastm1) {
+                JScmds::motor_cmd m1('m', 1, currentm1);
+                socket.send(zmq::buffer(m1.serialize()));
+            }
+            if (currentm2 != lastm2) {
+                JScmds::motor_cmd m2('m', 2, currentm2);
+                socket.send(zmq::buffer(m2.serialize()));
+            }
+            lastm1 = currentm1;
+            lastm2 = currentm2;
             usleep(rate);
         }
     }
