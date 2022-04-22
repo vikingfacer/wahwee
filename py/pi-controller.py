@@ -15,13 +15,32 @@ motor_cmd_format = "4schf"
 
 motor_cmd = namedtuple("motor_cmd", "channel command module percent")
 
-pwm1 = 12  # PWM pin connected to LED
+# enable pins
+
+# rb motor right
+pwm1 = 18
+enRBR = 6
+# yb motor right
 pwm2 = 13
-pwm3 = 18
+enYBR = 20
+# rb motor left
+pwm3 = 12
+enRBL = 5
+# yb motor left
 pwm4 = 19
+enYBL = 16
 
 GPIO.setwarnings(False)  # disable warnings
 GPIO.setmode(GPIO.BCM)  # set pin numbering system
+
+GPIO.setup(enRBR, GPIO.OUT)
+GPIO.setup(enRBL, GPIO.OUT)
+GPIO.setup(enYBR, GPIO.OUT)
+GPIO.setup(enYBL, GPIO.OUT)
+GPIO.output(enRBR, GPIO.HIGH)
+GPIO.output(enRBL, GPIO.HIGH)
+GPIO.output(enYBR, GPIO.HIGH)
+GPIO.output(enYBL, GPIO.HIGH)
 
 GPIO.setup(pwm1, GPIO.OUT)
 GPIO.setup(pwm2, GPIO.OUT)
@@ -29,9 +48,9 @@ GPIO.setup(pwm3, GPIO.OUT)
 GPIO.setup(pwm4, GPIO.OUT)
 
 modToPin = {
-    "m1": {"neg": GPIO.PWM(pwm1, 1000), "pos": GPIO.PWM(pwm2, 1000)},
+    "m1": {"neg": GPIO.PWM(pwm1, 1000), "pos": GPIO.PWM(pwm3, 1000)},
     "m2": {
-        "neg": GPIO.PWM(pwm3, 1000),
+        "neg": GPIO.PWM(pwm2, 1000),
         "pos": GPIO.PWM(pwm4, 1000),
     },
 }
