@@ -1,7 +1,6 @@
-cmake_minimum_required (VERSION 3.21.4)
+cmake_minimum_required (VERSION 3.21.2)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,12 +10,12 @@ set(CXX_FLAGS "-fconcepts-ts")
 
 project (joystick-service)
 
-find_package(Curses REQUIRED)
-include_directories(${CURSES_INCLUDE_DIR})
+#find_package(Curses REQUIRED)
+#include_directories(${CURSES_INCLUDE_DIR})
 
 find_package(yaml-cpp REQUIRED)
 include_directories(${YAML_CPP_INCLUDE_DIR})
-
+find_package(cppzmq)
 find_package(Threads REQUIRED)
 
 include(ExternalProject)
