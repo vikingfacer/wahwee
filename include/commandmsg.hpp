@@ -12,7 +12,7 @@ class motor_cmd
 {
   public:
     motor_cmd(char cmd, short mod, float per = 0)
-      : moto_cmd({ .ch = "JS ", .cmd = cmd, .mod = mod, .per = per }){};
+      : moto_cmd(cmd_struct{ .ch = "JS ", .cmd = cmd, .mod = mod, .per = per }){};
 
     std::vector<char> serialize()
     {
