@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 
-import math
+import attrs
 import argparse
+import asyncio
+import functools
+import math
 import os
 import sys
 import time
+import timer
+
 import zmq
-import struct
+import zmq.asyncio
 
-import RPi.GPIO as GPIO
-from collections import namedtuple
+import motorCmd
 
-motor_cmd_format = "4schf"
+try:
+    # checks if you have access to RPi.GPIO, which is available inside RPi
+    import RPi.GPIO as GPIO
+except:
+    # In case of exception, you are executing your script outside of RPi, so import Mock.GPIO
+    import Mock.GPIO as GPIO
 
-motor_cmd = namedtuple("motor_cmd", "channel command module percent")
 
 # enable pins
 
@@ -30,48 +38,77 @@ enRBL = 5
 pwm4 = 19
 enYBL = 16
 
-GPIO.setwarnings(False)  # disable warnings
+GPIO.setwarnings(True)  # disable warnings
 GPIO.setmode(GPIO.BCM)  # set pin numbering system
 
-GPIO.setup(enRBR, GPIO.OUT)
-GPIO.setup(enRBL, GPIO.OUT)
-GPIO.setup(enYBR, GPIO.OUT)
-GPIO.setup(enYBL, GPIO.OUT)
-GPIO.output(enRBR, GPIO.HIGH)
-GPIO.output(enRBL, GPIO.HIGH)
-GPIO.output(enYBR, GPIO.HIGH)
-GPIO.output(enYBL, GPIO.HIGH)
 
-GPIO.setup(pwm1, GPIO.OUT)
-GPIO.setup(pwm2, GPIO.OUT)
-GPIO.setup(pwm3, GPIO.OUT)
-GPIO.setup(pwm4, GPIO.OUT)
+class motormodule:
+    def __init__(self, neg: int, negEn: int, pos: int, posEn: int, shutoff: int):
+        for arg in locals():
+            GPIO.setup(arg, GPIO.OUT)
+            GPIO.output(arg, GPIO.LOW)
 
-modToPin = {
-    "m1": {"neg": GPIO.PWM(pwm1, 1000), "pos": GPIO.PWM(pwm3, 1000)},
-    "m2": {
-        "neg": GPIO.PWM(pwm2, 1000),
-        "pos": GPIO.PWM(pwm4, 1000),
-    },
-}
+        self._neg = GPIO.PWM(neg, 1000)
+        self._negEn = negEn
+        self._pos = GPIO.PWM(pos, 1000)
+        self._posEn = posEn
+        self._last_cmd = time.time_ns()
+        self._pos.start(0)
+        self._neg.start(0)
+        self.shutoff = shutoff
 
-modToPin["m1"]["neg"].start(100.0)
-modToPin["m1"]["pos"].start(100.0)
-modToPin["m2"]["neg"].start(100.0)
-modToPin["m2"]["pos"].start(100.0)
+    def motor(self, pwm_percent) -> None:
+
+        self._last_cmd = time.time_ns()
+        self._neg.ChangeDutyCycle(0)
+        self._pos.ChangeDutyCycle(0)
+
+        if pwm_percent > 20:
+            GPIO.output(self._posEn, GPIO.HIGH)
+            GPIO.output(self._negEn, GPIO.LOW)
+            self._pos.ChangeDutyCycle(pwm_percent)
+        elif pwm_percent < -20:
+            print("changing negative pin duty cycle")
+            GPIO.output(self._posEn, GPIO.LOW)
+            GPIO.output(self._negEn, GPIO.HIGH)
+            self._neg.ChangeDutyCycle(-1 * pwm_percent)
+
+    def checkpins(self):
+        if time.time_ns() - self._last_cmd > self.shutoff:
+            GPIO.output(self._posEn, GPIO.LOW)
+            GPIO.output(self._negEn, GPIO.LOW)
 
 
-def motor(module, pwm_percent):
+@timer.timer(1, is_oneshot=False)
+def checkPins(modules):
+    print("checkin pins", flush=True)
+    modules["m1"].checkpins()
+    modules["m2"].checkpins()
 
-    module["neg"].ChangeDutyCycle(0)
-    module["pos"].ChangeDutyCycle(0)
 
-    if pwm_percent > 20:
-        print("changing positive duty cycle")
-        module["pos"].ChangeDutyCycle(pwm_percent)
-    elif pwm_percent < -20:
-        print("changing negative pin duty cycle")
-        module["neg"].ChangeDutyCycle(-1 * pwm_percent)
+async def receiveSubScription(modToPin, subIP, subscription) -> None:
+    context = zmq.asyncio.Context()
+    socket = context.socket(zmq.SUB)
+    socket.connect(subIP)
+    socket.setsockopt(zmq.SUBSCRIBE, subscription)
+    while True:
+        data = await socket.recv()
+        print("length:{} data: {}".format(len(data), data), flush=True)
+        try:
+            unpackedmotor = motorCmd.toTuple(data)
+            print(unpackedmotor)
+            processCmd(modToPin, unpackedmotor)
+
+        except Exception as e:
+            print(e)
+
+
+def processCmd(modToPin, cmd) -> None:
+    if cmd.command == b"m":
+        if cmd.module == 1:
+            modToPin["m1"].motor(cmd.percent)
+        elif cmd.module == 2:
+            modToPin["m2"].motor(cmd.percent)
 
 
 if __name__ == "__main__":
@@ -83,25 +120,15 @@ if __name__ == "__main__":
 
     parsed = parser.parse_args()
     print(parsed)
-    context = zmq.Context()
-    socket = context.socket(zmq.SUB)
-    socket.connect("tcp://" + parsed.ip + ":" + parsed.port)
-
+    ip = "tcp://" + parsed.ip + ":" + parsed.port
     subscription = b"JS "
-    socket.setsockopt(zmq.SUBSCRIBE, subscription)
 
-    while True:
-        data = socket.recv()
-        print("length:{} data: {}".format(len(data), data))
-        try:
-            unpackedmotor = motor_cmd._make(struct.unpack(motor_cmd_format, data))
-            print(unpackedmotor)
-
-            if unpackedmotor.command == b"m":
-                if unpackedmotor.module == 1:
-                    motor(modToPin["m1"], unpackedmotor.percent)
-                elif unpackedmotor.module == 2:
-                    motor(modToPin["m2"], unpackedmotor.percent)
-
-        except Exception as e:
-            print(e)
+    modToPin = {
+        "m1": motormodule(pwm1, enRBR, pwm3, enYBR, 200),
+        "m2": motormodule(pwm2, enRBL, pwm4, enYBL, 200),
+    }
+    asyncio.run(
+        asyncio.wait(
+            [checkPins(modToPin), receiveSubScription(modToPin, ip, subscription)]
+        )
+    )
