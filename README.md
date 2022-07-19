@@ -1,15 +1,23 @@
 
+# Wahwee
+Wahwee is a robot from scratch project. Aiming at reproducibility. This repo only contains the software for the project. Wahwee is more than just software, Building the battery, power bus and robot frame are also big components of this project but currently not posted.
+## Joystick Server
+The Joystick controller reads the input from a joystick controller Xbox, PS\<__whatever__> and publishes commands that are consumed but the listener
 
-Configuration:
-  The configuration is a text file.
-  Format:
-  line 0: Type <Xbox, PSwhatever>
-  line 1: Axis 0
-  line 2+: Axis 1
-  ....
-  last line: last Axis
+## Pin Controller
+The Pin Controller/py-controller subscripts the the Joystick Server and updates the outputs and inputs of the RPi pins.
 
-ser2net is used on the raspberry so the controller service
-only needs to connect to the tcp socket on the raspberry pi.
+## How it runs
+* Pin Controller RPi acts as wifi AP
+* Joystick Server connects as wifi client
+* Joystick Server remotely starts Pin Controller with unique subscription
+* Joystick To Controller communications Commence
 
-/dev/ttyUSB0 is located on port 5050
+## Road Map
+[x] Basic Controlling of Motors
+[x] RPi wifi AP
+[  ] unique Subscription
+[  ] Script for Pin Controller
+[  ] Camera support (Just using RPi motion)
+[  ] custom Linux image recipe for Pin Controller and other robot services
+[  ] Robot Arm Support
