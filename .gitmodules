@@ -1,0 +1,3 @@
+[submodule "wahwee-system"]
+	path = wahwee-system
+	url = git@github.com:vikingfacer/wahwee-system.git
